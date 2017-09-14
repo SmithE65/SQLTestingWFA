@@ -31,6 +31,11 @@ namespace SQLTestingWFA
 
         }
 
+        /// <summary>
+        /// The connect or disconnect button has been clicked
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void SQLConnDisconn_Click(object sender, EventArgs e)
         {
             if (!IsSqlConnected)
@@ -42,10 +47,16 @@ namespace SQLTestingWFA
                 IsSqlConnected = false;
                 CurrentDatabase.Items.Clear();
                 CurrentTable.Items.Clear();
+                DataTable table = (DataTable)dataGridView1.DataSource;
+                if (table != null)
+                    table.Dispose();
                 dataGridView1.DataSource = null;
             }
         }
 
+        /// <summary>
+        /// Gets a list of databases from SQL Server and stores them in the CurrentDatabase dropdown
+        /// </summary>
         private void GetDatabaseList()
         {
             // If we don't have a SQL connection, give up
@@ -76,6 +87,9 @@ namespace SQLTestingWFA
             }
         }
 
+        /// <summary>
+        /// Gets a list of tables from the current database and stores them in the CurrentTable dropdown
+        /// </summary>
         private void GetTableList()
         {
             // If we don't have a SQL connection, give up
@@ -106,6 +120,9 @@ namespace SQLTestingWFA
             }
         }
 
+        /// <summary>
+        /// Makes a test connection to SQL Server and calls GetDatabaseList(), if successful
+        /// </summary>
         public void SqlConnect()
         {
             // TO-DO: ADD SQL Connection logic here
@@ -142,6 +159,11 @@ namespace SQLTestingWFA
             GetDatabaseList();
         }
 
+        /// <summary>
+        /// Called when user makes a selection in the CurrentDatabase dropdown
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void CurrentDatabase_SelectionChangeCommitted(object sender, EventArgs e)
         {
             if (!IsSqlConnected)
@@ -157,40 +179,55 @@ namespace SQLTestingWFA
             GetTableList();
         }
 
+        /// <summary>
+        /// Called when user makes a selection in the CurrentTable dropdown
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void CurrentTable_SelectionChangeCommitted(object sender, EventArgs e)
         {
+            // Dispose of any existing table and get a new one
             string tableName = CurrentTable.Text;
-            DataTable table = new DataTable(tableName);
-            DataTable schema = null;
+            DataTable table = (DataTable)dataGridView1.DataSource;
+            if (table != null)
+            {
+                table.Dispose();
+            }
+            table = new DataTable();
 
+            // Get a SQL schema of all columns in current table
+            DataTable schema = null;
             using (SqlConnection conn = new SqlConnection(connString))
             {
                 conn.Open();
-                conn.ChangeDatabase(CurrentDatabase.Text);
+                conn.ChangeDatabase(CurrentDatabase.Text);  // Make sure we're in the right database
 
                 string[] restrictions = new string[3];
-                restrictions[2] = tableName;
+                restrictions[2] = tableName;    // We want to restrict to current table only
 
                 schema = conn.GetSchema("Columns", restrictions);
 
-                conn.Close();
+                conn.Close();   // Clean up
             }
 
+            // Get all of our column names and associated datatypes
             List<string> dataTypes = new List<string>();
             foreach (DataRow row in schema.Rows)
             {
-                table.Columns.Add(row[3].ToString(), tableName.GetType());
+                table.Columns.Add(row[3].ToString(), tableName.GetType());  // Directly store our column names
                 dataTypes.Add(row[7].ToString());
             }
-
-            object[] o = new object[table.Columns.Count];
-            for (int i = 0; i < table.Columns.Count; i++)
-            {
-                o[i] = dataTypes[i];
-            }
-            table.Rows.Add(o);
+            table.Rows.Add(dataTypes.ToArray());    // Put all the datatypes into the first row
+            table.Rows.Add();
 
             dataGridView1.DataSource = table;
+        }
+
+        private void dataGridView1_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            // I haven't decided what to do here yet, so we do a popup telling the user how many cells have been selected
+            int count = dataGridView1.SelectedCells.Count;
+            MessageBox.Show($"{count} cell(s) selected.", "Test3");
         }
     }
 }
